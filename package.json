@@ -1,0 +1,84 @@
+{
+  "name": "figma-make-app",
+  "description": "Temporizador de concentración y control horario personal.",
+  "author": "Pausa",
+  "private": true,
+  "version": "1.0.1",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview",
+    "format": "oxfmt",
+    "desktop": "electron .",
+    "desktop:package": "pnpm build && electron-builder --dir",
+    "desktop:windows": "pnpm build && electron-builder --win",
+    "desktop:mac": "pnpm build && electron-builder --mac",
+    "desktop:windows:publish": "pnpm build && electron-builder --win --publish always",
+    "desktop:mac:publish": "pnpm build && electron-builder --mac --publish always"
+  },
+  "main": "electron/main.cjs",
+  "build": {
+    "appId": "com.pausa.focus",
+    "productName": "Pausa",
+    "artifactName": "Pausa-${version}-${arch}.${ext}",
+    "directories": {
+      "output": "release"
+    },
+    "files": [
+      "dist/**/*",
+      "electron/**/*",
+      "package.json"
+    ],
+    "asar": true,
+    "mac": {
+      "category": "public.app-category.productivity",
+      "target": [
+        "dmg",
+        "zip"
+      ]
+    },
+    "win": {
+      "target": [
+        {
+          "target": "nsis",
+          "arch": [
+            "x64",
+            "arm64"
+          ]
+        }
+      ]
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "Pausa"
+    },
+    "publish": {
+      "provider": "github",
+      "owner": "jose8604",
+      "repo": "PAUSA",
+      "releaseType": "release"
+    }
+  },
+  "dependencies": {
+    "electron-updater": "^6.8.9",
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0"
+  },
+  "devDependencies": {
+    "@tailwindcss/vite": "^4.0.0",
+    "@types/node": "^22.0.0",
+    "@types/react": "^19.0.0",
+    "@types/react-dom": "^19.0.0",
+    "@vitejs/plugin-react": "^6.0.0",
+    "electron": "^44.5.1",
+    "electron-builder": "^26.15.3",
+    "oxfmt": "^0.2.0",
+    "tailwindcss": "^4.0.0",
+    "typescript": "^5.7.0",
+    "vite": "^8.0.5"
+  }
+}
