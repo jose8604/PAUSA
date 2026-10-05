@@ -1,0 +1,10 @@
+{
+  "description": "This time management app helps users track work hours with customizable timers, productivity notes, and a user-friendly interface for enhanced focus.",
+  "robots": {
+    "index": false
+  },
+  "accessibility": {
+    "addBypassLinks": false,
+    "ignoreReducedMotion": false
+  }
+}
