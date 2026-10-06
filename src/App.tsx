@@ -89,7 +89,22 @@ type FocusSession = {
 }
 
 const HISTORY_KEY = "pausa-history"
+const THEME_KEY = "pausa-theme"
 const ratingLabels = ["Nada", "Poco", "Bien", "Mucho", "Excelente"]
+const themeOptions = [
+  { id: "forest", label: "Bosque", color: "#1f4a3b" },
+  { id: "ocean", label: "Océano", color: "#275c70" },
+  { id: "clay", label: "Arcilla", color: "#8a4f3d" },
+  { id: "lavender", label: "Lavanda", color: "#5d527d" },
+] as const
+type ThemeId = (typeof themeOptions)[number]["id"]
+
+function readTheme(): ThemeId {
+  const theme = localStorage.getItem(THEME_KEY)
+  return themeOptions.some((option) => option.id === theme)
+    ? (theme as ThemeId)
+    : "forest"
+}
 
 function dateKey(date: Date) {
   return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`
@@ -585,7 +600,15 @@ function CompletionModal({
   )
 }
 
-function Dashboard({ name }: { name: string }) {
+function Dashboard({
+  name,
+  theme,
+  onThemeChange,
+}: {
+  name: string
+  theme: ThemeId
+  onThemeChange: (theme: ThemeId) => void
+}) {
   const defaultDuration = 2 * 60 * 60
   const today = useMemo(
     () =>
@@ -604,8 +627,11 @@ function Dashboard({ name }: { name: string }) {
   const [showCompletion, setShowCompletion] = useState(false)
   const [history, setHistory] = useState<FocusSession[]>(readHistory)
   const [showCalendar, setShowCalendar] = useState(false)
+  const [showProfile, setShowProfile] = useState(false)
   const [finishedAt, setFinishedAt] = useState("")
   const [saveError, setSaveError] = useState("")
+  const deadlineRef = useRef<number | null>(null)
+  const profileRef = useRef<HTMLDivElement>(null)
   const [legacySessions] = useState(() => {
     const count = Number(localStorage.getItem("pausa-sessions") || 0)
     return Number.isInteger(count) && count > 0 ? count : 0
@@ -618,20 +644,62 @@ function Dashboard({ name }: { name: string }) {
 
   useEffect(() => {
     if (status !== "running") return
-    const timer = window.setInterval(() => {
-      setRemaining((current) => {
-        if (current <= 1) {
-          window.clearInterval(timer)
-          setStatus("idle")
-          setFinishedAt(new Date().toISOString())
-          setShowCompletion(true)
-          return 0
-        }
-        return current - 1
-      })
-    }, 1000)
-    return () => window.clearInterval(timer)
+
+    if (deadlineRef.current === null) {
+      deadlineRef.current = Date.now() + remaining * 1000
+    }
+
+    function syncWithClock() {
+      if (deadlineRef.current === null) return
+      const next = Math.max(
+        0,
+        Math.ceil((deadlineRef.current - Date.now()) / 1000),
+      )
+      setRemaining(next)
+
+      if (next === 0) {
+        deadlineRef.current = null
+        setStatus("idle")
+        setFinishedAt(new Date().toISOString())
+        setShowCompletion(true)
+      }
+    }
+
+    syncWithClock()
+    const timer = window.setInterval(syncWithClock, 250)
+    window.addEventListener("focus", syncWithClock)
+    document.addEventListener("visibilitychange", syncWithClock)
+
+    return () => {
+      window.clearInterval(timer)
+      window.removeEventListener("focus", syncWithClock)
+      document.removeEventListener("visibilitychange", syncWithClock)
+    }
   }, [status])
+
+  useEffect(() => {
+    if (!showProfile) return
+
+    function closeProfile(event: MouseEvent) {
+      if (
+        event.target instanceof Node &&
+        !profileRef.current?.contains(event.target)
+      ) {
+        setShowProfile(false)
+      }
+    }
+
+    function closeOnEscape(event: KeyboardEvent) {
+      if (event.key === "Escape") setShowProfile(false)
+    }
+
+    document.addEventListener("mousedown", closeProfile)
+    document.addEventListener("keydown", closeOnEscape)
+    return () => {
+      document.removeEventListener("mousedown", closeProfile)
+      document.removeEventListener("keydown", closeOnEscape)
+    }
+  }, [showProfile])
 
   const progress = useMemo(
     () => Math.min(100, ((duration - remaining) / duration) * 100),
@@ -646,7 +714,37 @@ function Dashboard({ name }: { name: string }) {
     setRemaining(next)
   }
 
+  function startSession() {
+    deadlineRef.current = Date.now() + remaining * 1000
+    setStatus("running")
+  }
+
+  function togglePause() {
+    if (status === "running") {
+      if (deadlineRef.current !== null) {
+        setRemaining(
+          Math.max(
+            0,
+            Math.ceil((deadlineRef.current - Date.now()) / 1000),
+          ),
+        )
+      }
+      deadlineRef.current = null
+      setStatus("paused")
+      return
+    }
+
+    deadlineRef.current = Date.now() + remaining * 1000
+    setStatus("running")
+  }
+
   function finishSession() {
+    if (status === "running" && deadlineRef.current !== null) {
+      setRemaining(
+        Math.max(0, Math.ceil((deadlineRef.current - Date.now()) / 1000)),
+      )
+    }
+    deadlineRef.current = null
     setStatus("idle")
     setFinishedAt(new Date().toISOString())
     setShowCompletion(true)
@@ -674,6 +772,7 @@ function Dashboard({ name }: { name: string }) {
   }
 
   function closeCompletion() {
+    deadlineRef.current = null
     setSaveError("")
     setShowCompletion(false)
     setDuration(defaultDuration)
@@ -699,7 +798,88 @@ function Dashboard({ name }: { name: string }) {
           >
             <Icon name="calendar" />
           </button>
-          <div className="avatar">{name.slice(0, 1).toUpperCase()}</div>
+          <div className="profile-control" ref={profileRef}>
+            <button
+              className="avatar"
+              aria-label="Abrir personalización y perfil"
+              aria-expanded={showProfile}
+              aria-controls="profile-panel"
+              onClick={() => setShowProfile((current) => !current)}
+              title="Tu perfil"
+            >
+              {name.slice(0, 1).toUpperCase()}
+            </button>
+            {showProfile && (
+              <section
+                className="profile-popover"
+                id="profile-panel"
+                aria-label="Perfil y personalización"
+              >
+                <header className="profile-heading">
+                  <span className="profile-avatar">
+                    {name.slice(0, 1).toUpperCase()}
+                  </span>
+                  <div>
+                    <strong>{name}</strong>
+                    <small>Perfil local de Pausa</small>
+                  </div>
+                </header>
+
+                <div className="profile-stats" aria-label="Tu resumen">
+                  <span>
+                    <strong>{sessions}</strong>
+                    <small>sesiones</small>
+                  </span>
+                  <span>
+                    <strong>{formatHours(totalSeconds(history))}</strong>
+                    <small>de foco</small>
+                  </span>
+                  <span>
+                    <strong>{streak}</strong>
+                    <small>racha</small>
+                  </span>
+                </div>
+
+                <div className="theme-picker">
+                  <p>COLOR DE LA INTERFAZ</p>
+                  <div className="theme-options">
+                    {themeOptions.map((option) => (
+                      <button
+                        key={option.id}
+                        className={theme === option.id ? "selected" : ""}
+                        onClick={() => onThemeChange(option.id)}
+                        aria-pressed={theme === option.id}
+                      >
+                        <i style={{ background: option.color }} />
+                        <span>{option.label}</span>
+                        {theme === option.id && <Icon name="check" size={14} />}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                <button
+                  className="profile-calendar-btn"
+                  onClick={() => {
+                    setShowProfile(false)
+                    setShowCalendar(true)
+                  }}
+                >
+                  <Icon name="calendar" size={17} />
+                  <span>
+                    <strong>Historial de concentración</strong>
+                    <small>Consulta tus sesiones y avances</small>
+                  </span>
+                  <Icon name="chevron-right" size={16} />
+                </button>
+
+                <p className="profile-privacy">
+                  <Icon name="check" size={13} />
+                  Tus preferencias y datos siguen solo en este dispositivo.
+                </p>
+              </section>
+            )}
+          </div>
         </div>
       </header>
 
@@ -784,7 +964,7 @@ function Dashboard({ name }: { name: string }) {
             {status === "idle" ? (
               <button
                 className="primary-btn start-btn"
-                onClick={() => setStatus("running")}
+                onClick={startSession}
               >
                 <Icon name="play" />
                 Empezar sesión
@@ -793,9 +973,7 @@ function Dashboard({ name }: { name: string }) {
               <>
                 <button
                   className="primary-btn start-btn"
-                  onClick={() =>
-                    setStatus(status === "running" ? "paused" : "running")
-                  }
+                  onClick={togglePause}
                 >
                   <Icon name={status === "running" ? "pause" : "play"} />
                   {status === "running" ? "Pausar" : "Continuar"}
@@ -869,15 +1047,29 @@ export default function App() {
   const [name, setName] = useState(
     () => localStorage.getItem("pausa-name") || "",
   )
+  const [theme, setTheme] = useState<ThemeId>(readTheme)
 
   function completeLogin(value: string) {
     localStorage.setItem("pausa-name", value)
     setName(value)
   }
 
+  function changeTheme(value: ThemeId) {
+    localStorage.setItem(THEME_KEY, value)
+    setTheme(value)
+  }
+
   return (
-    <div className="desktop">
-      {name ? <Dashboard name={name} /> : <Login onComplete={completeLogin} />}
+    <div className="desktop" data-theme={theme}>
+      {name ? (
+        <Dashboard
+          name={name}
+          theme={theme}
+          onThemeChange={changeTheme}
+        />
+      ) : (
+        <Login onComplete={completeLogin} />
+      )}
     </div>
   )
 }
