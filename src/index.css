@@ -366,6 +366,27 @@ form .primary-btn {
   background: var(--sage-light);
 }
 
+.badge-trigger {
+  position: relative;
+}
+
+.badge-count {
+  position: absolute;
+  top: 1px;
+  right: 0;
+  min-width: 15px;
+  height: 15px;
+  display: grid;
+  place-items: center;
+  padding: 0 3px;
+  border: 2px solid var(--paper);
+  border-radius: 8px;
+  color: var(--white);
+  background: var(--forest);
+  font-size: 7px;
+  font-weight: 700;
+}
+
 .avatar {
   width: 36px;
   height: 36px;
@@ -677,6 +698,16 @@ form .primary-btn {
   background: #d39b4a;
 }
 
+.status-pill.overtime {
+  color: var(--forest);
+  font-weight: 600;
+}
+
+.status-pill.overtime > span {
+  background: var(--forest);
+  box-shadow: 0 0 0 3px var(--sage);
+}
+
 .quiet-btn {
   min-height: 32px;
   display: inline-flex;
@@ -715,6 +746,15 @@ form .primary-btn {
   color: #9aa49f;
   font-size: 8px;
   letter-spacing: .16em;
+}
+
+.timer-display.is-overtime p {
+  color: var(--forest);
+}
+
+.timer-display.is-overtime > span {
+  color: var(--forest);
+  font-weight: 600;
 }
 
 .timer-adjust {
@@ -900,6 +940,18 @@ form .primary-btn {
   margin: 8px 0 22px;
   color: var(--ink-soft);
   font-size: 12px;
+}
+
+.extra-summary {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  margin: -12px 0 22px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  color: var(--forest);
+  background: var(--sage-light);
+  font-size: 10px;
 }
 
 .note-label textarea {
@@ -1112,6 +1164,200 @@ button:focus-visible {
 .calendar-modal::backdrop {
   background: rgba(21, 36, 30, .45);
   backdrop-filter: blur(5px);
+}
+
+.badges-modal {
+  width: min(720px, calc(100% - 40px));
+  max-height: calc(100dvh - 40px);
+  margin: auto;
+  overflow: auto;
+  border: 1px solid var(--line);
+  color: var(--ink);
+}
+
+.badges-modal::backdrop {
+  background: rgba(21, 36, 30, .45);
+  backdrop-filter: blur(5px);
+}
+
+.badges-modal > .eyebrow {
+  padding-right: 30px;
+}
+
+.weekly-progress {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  align-items: center;
+  gap: 14px;
+  margin: 24px 0 28px;
+  padding: 17px;
+  border: 1px solid var(--line);
+  border-radius: 15px;
+  background: var(--sage-light);
+}
+
+.weekly-award {
+  width: 46px;
+  height: 46px;
+  display: grid;
+  place-items: center;
+  border-radius: 14px;
+  color: var(--forest);
+  background: var(--sage);
+}
+
+.weekly-copy {
+  min-width: 0;
+  display: grid;
+  gap: 5px;
+}
+
+.weekly-copy small,
+.weekly-streak small,
+.badges-heading small,
+.badge-card small {
+  color: var(--ink-soft);
+  font-size: 8px;
+  font-weight: 600;
+  letter-spacing: .09em;
+}
+
+.weekly-copy strong {
+  font: 600 13px "Manrope", sans-serif;
+}
+
+.weekly-progress-track {
+  height: 4px;
+  margin-top: 2px;
+  overflow: hidden;
+  border-radius: 4px;
+  background: var(--line);
+}
+
+.weekly-progress-track span {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: var(--forest);
+}
+
+.weekly-streak {
+  display: grid;
+  justify-items: end;
+  gap: 2px;
+  padding-left: 16px;
+  border-left: 1px solid var(--line);
+}
+
+.weekly-streak strong {
+  font: 600 24px "Manrope", sans-serif;
+  color: var(--forest);
+}
+
+.weekly-streak small {
+  max-width: 80px;
+  text-align: right;
+  letter-spacing: 0;
+}
+
+.badges-heading {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 20px;
+  margin-bottom: 12px;
+}
+
+.badges-heading > div {
+  display: grid;
+  gap: 3px;
+}
+
+.badges-heading > div > strong {
+  font: 600 14px "Manrope", sans-serif;
+}
+
+.badges-heading > span {
+  color: var(--ink-soft);
+  font-size: 9px;
+}
+
+.badges-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+
+.badge-card {
+  min-width: 0;
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 15px;
+  border: 1px solid var(--line);
+  border-radius: 13px;
+  background: var(--cream);
+}
+
+.badge-card.locked {
+  opacity: .62;
+  background: transparent;
+}
+
+.badge-medallion {
+  width: 39px;
+  height: 39px;
+  display: grid;
+  flex: 0 0 auto;
+  place-items: center;
+  border-radius: 50%;
+  color: var(--ink-soft);
+  background: var(--line);
+}
+
+.badge-card.earned .badge-medallion {
+  color: var(--forest);
+  background: var(--sage);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--forest) 25%, transparent);
+}
+
+.badge-card > div {
+  min-width: 0;
+  display: grid;
+  gap: 4px;
+}
+
+.badge-card.earned small {
+  color: var(--forest);
+}
+
+.badge-card strong {
+  font: 600 12px "Manrope", sans-serif;
+}
+
+.badge-card p {
+  margin: 0;
+  color: var(--ink-soft);
+  font-size: 9px;
+  line-height: 1.5;
+}
+
+.badges-note {
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  gap: 7px;
+  margin: 20px 0 0;
+  color: var(--ink-soft);
+  font-size: 9px;
+  line-height: 1.6;
+  text-align: center;
+}
+
+.badges-note svg {
+  flex: 0 0 auto;
+  margin-top: 1px;
+  color: var(--forest);
 }
 
 .calendar-modal > .eyebrow { padding-right: 28px; }
@@ -1350,6 +1596,11 @@ button:focus-visible {
 }
 
 @media (max-width: 680px) {
+  .badges-modal { width: calc(100% - 24px); max-height: calc(100dvh - 24px); padding: 26px 18px; }
+  .weekly-progress { grid-template-columns: auto 1fr; }
+  .weekly-streak { grid-column: 1 / -1; grid-template-columns: auto 1fr; justify-items: start; align-items: baseline; padding: 10px 0 0; border-top: 1px solid var(--line); border-left: 0; }
+  .weekly-streak small { max-width: none; text-align: left; }
+  .badges-grid { grid-template-columns: 1fr; }
   .calendar-modal { width: calc(100% - 24px); max-height: calc(100dvh - 24px); padding: 26px 18px; }
   .calendar-modal h2 { font-size: 22px; padding-right: 20px; }
   .calendar-modal > .eyebrow { font-size: 8px; }

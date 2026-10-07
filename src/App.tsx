@@ -7,7 +7,7 @@ import {
   useState,
 } from "react"
 
-type IconName = "clock" | "minus" | "plus" | "play" | "pause" | "stop" | "calendar" | "check" | "leaf" | "settings" | "chevron-left" | "chevron-right" | "close"
+type IconName = "clock" | "minus" | "plus" | "play" | "pause" | "stop" | "calendar" | "award" | "check" | "leaf" | "settings" | "chevron-left" | "chevron-right" | "close"
 
 function Icon({ name, size = 18 }: {
   name: IconName
@@ -34,6 +34,13 @@ function Icon({ name, size = 18 }: {
       <>
         <rect x="4" y="5" width="16" height="15" rx="3" />
         <path d="M8 3v4M16 3v4M4 10h16" />
+      </>
+    ),
+    award: (
+      <>
+        <circle cx="12" cy="9" r="5" />
+        <path d="m8.5 13-1 8 4.5-2.5 4.5 2.5-1-8" />
+        <path d="m10.2 9 1.2 1.2L14 7.8" />
       </>
     ),
     check: <path d="m6 12 4 4 8-8" />,
@@ -165,6 +172,84 @@ function currentStreak(history: FocusSession[]) {
     day.setDate(day.getDate() - 1)
   }
   return streak
+}
+
+const weeklyBadges = [
+  {
+    weeks: 1,
+    title: "Semana en marcha",
+    description: "Completa tu primera semana activa.",
+  },
+  {
+    weeks: 2,
+    title: "Ritmo sostenible",
+    description: "Mantén dos semanas activas consecutivas.",
+  },
+  {
+    weeks: 4,
+    title: "Constancia mensual",
+    description: "Encadena cuatro semanas activas.",
+  },
+  {
+    weeks: 8,
+    title: "Hábito consolidado",
+    description: "Sostén tu ritmo durante ocho semanas.",
+  },
+]
+
+function weekKey(date: Date) {
+  const monday = new Date(date)
+  monday.setHours(12, 0, 0, 0)
+  monday.setDate(monday.getDate() - ((monday.getDay() + 6) % 7))
+  return dateKey(monday)
+}
+
+function moveWeek(key: string, amount: number) {
+  const date = new Date(`${key}T12:00:00`)
+  date.setDate(date.getDate() + amount * 7)
+  return dateKey(date)
+}
+
+function weeklyFocusStats(history: FocusSession[]) {
+  const activeDays = new Map<string, Set<string>>()
+  for (const session of history) {
+    const date = new Date(session.finishedAt)
+    const key = weekKey(date)
+    const days = activeDays.get(key) || new Set<string>()
+    days.add(dateKey(date))
+    activeDays.set(key, days)
+  }
+
+  const qualifyingWeeks = new Set(
+    [...activeDays.entries()]
+      .filter(([, days]) => days.size >= 3)
+      .map(([key]) => key),
+  )
+  const thisWeek = weekKey(new Date())
+  let cursor = qualifyingWeeks.has(thisWeek)
+    ? thisWeek
+    : moveWeek(thisWeek, -1)
+  let current = 0
+
+  while (qualifyingWeeks.has(cursor)) {
+    current += 1
+    cursor = moveWeek(cursor, -1)
+  }
+
+  let best = 0
+  let sequence = 0
+  let previous = ""
+  for (const key of [...qualifyingWeeks].sort()) {
+    sequence = previous && moveWeek(previous, 1) === key ? sequence + 1 : 1
+    best = Math.max(best, sequence)
+    previous = key
+  }
+
+  return {
+    activeDaysThisWeek: activeDays.get(thisWeek)?.size || 0,
+    currentStreak: current,
+    bestStreak: best,
+  }
 }
 
 function CalendarModal({
@@ -438,6 +523,136 @@ function CalendarModal({
   )
 }
 
+function BadgesModal({
+  history,
+  onClose,
+}: {
+  history: FocusSession[]
+  onClose: () => void
+}) {
+  const dialogRef = useRef<HTMLDialogElement>(null)
+  const stats = weeklyFocusStats(history)
+  const earned = weeklyBadges.filter(
+    (badge) => stats.bestStreak >= badge.weeks,
+  ).length
+  const nextBadge = weeklyBadges.find(
+    (badge) => stats.bestStreak < badge.weeks,
+  )
+
+  useEffect(() => {
+    const dialog = dialogRef.current
+    const previouslyFocused = document.activeElement as HTMLElement | null
+    dialog?.showModal()
+    return () => {
+      dialog?.close()
+      previouslyFocused?.focus()
+    }
+  }, [])
+
+  return (
+    <dialog
+      ref={dialogRef}
+      className="modal badges-modal"
+      aria-labelledby="badges-title"
+      onCancel={onClose}
+      onClick={(event) => {
+        if (event.target !== event.currentTarget) return
+        const bounds = event.currentTarget.getBoundingClientRect()
+        if (
+          event.clientX < bounds.left ||
+          event.clientX > bounds.right ||
+          event.clientY < bounds.top ||
+          event.clientY > bounds.bottom
+        )
+          onClose()
+      }}
+    >
+      <button
+        className="icon-btn modal-close"
+        onClick={onClose}
+        aria-label="Cerrar insignias"
+        autoFocus
+      >
+        <Icon name="close" />
+      </button>
+
+      <p className="eyebrow">UN RITMO QUE PUEDAS MANTENER</p>
+      <h2 id="badges-title">Insignias de constancia</h2>
+      <p className="modal-subtitle">
+        No necesitas trabajar todos los días. Una semana activa se consigue al
+        concentrarte en 3 días distintos; el resto puede ser descanso.
+      </p>
+
+      <section className="weekly-progress">
+        <span className="weekly-award">
+          <Icon name="award" size={25} />
+        </span>
+        <div className="weekly-copy">
+          <small>ESTA SEMANA</small>
+          <strong>
+            {stats.activeDaysThisWeek} de 3 días de foco
+          </strong>
+          <div className="weekly-progress-track" aria-hidden="true">
+            <span
+              style={{
+                width: `${Math.min(100, (stats.activeDaysThisWeek / 3) * 100)}%`,
+              }}
+            />
+          </div>
+        </div>
+        <div className="weekly-streak">
+          <strong>{stats.currentStreak}</strong>
+          <small>
+            {stats.currentStreak === 1 ? "semana seguida" : "semanas seguidas"}
+          </small>
+        </div>
+      </section>
+
+      <div className="badges-heading">
+        <div>
+          <strong>Tu colección</strong>
+          <small>
+            {earned} de {weeklyBadges.length} desbloqueadas
+          </small>
+        </div>
+        <span>Mejor racha: {stats.bestStreak} semanas</span>
+      </div>
+
+      <section className="badges-grid" aria-label="Colección de insignias">
+        {weeklyBadges.map((badge) => {
+          const isEarned = stats.bestStreak >= badge.weeks
+          return (
+            <article
+              key={badge.weeks}
+              className={`badge-card ${isEarned ? "earned" : "locked"}`}
+            >
+              <span className="badge-medallion">
+                <Icon name={isEarned ? "award" : "clock"} size={22} />
+              </span>
+              <div>
+                <small>
+                  {isEarned
+                    ? "DESBLOQUEADA"
+                    : `${badge.weeks} ${badge.weeks === 1 ? "SEMANA" : "SEMANAS"}`}
+                </small>
+                <strong>{badge.title}</strong>
+                <p>{badge.description}</p>
+              </div>
+            </article>
+          )
+        })}
+      </section>
+
+      <p className="badges-note">
+        <Icon name="leaf" size={15} />
+        {nextBadge
+          ? `Tu siguiente insignia llega al alcanzar ${nextBadge.weeks} ${nextBadge.weeks === 1 ? "semana activa" : "semanas activas seguidas"}.`
+          : "Has completado toda la colección. Mantén un ritmo que también deje espacio para descansar."}
+      </p>
+    </dialog>
+  )
+}
+
 function Login({ onComplete }: { onComplete: (name: string) => void }) {
   const [name, setName] = useState("")
   const [password, setPassword] = useState("")
@@ -515,11 +730,13 @@ function Login({ onComplete }: { onComplete: (name: string) => void }) {
 
 function CompletionModal({
   elapsed,
+  extra,
   onClose,
   onSave,
   error,
 }: {
   elapsed: number
+  extra: number
   onClose: () => void
   onSave: (note: string, rating: number) => void
   error: string
@@ -550,6 +767,12 @@ function CompletionModal({
         <p className="modal-subtitle">
           Has dedicado <strong>{formatHours(elapsed)}</strong> a avanzar.
         </p>
+        {extra > 0 && (
+          <p className="extra-summary">
+            <Icon name="clock" size={15} />
+            Incluye <strong>{formatHours(extra)}</strong> de tiempo extra.
+          </p>
+        )}
         <label className="note-label">
           <span>¿Qué has conseguido?</span>
           <textarea
@@ -623,14 +846,19 @@ function Dashboard({
   )
   const [duration, setDuration] = useState(defaultDuration)
   const [remaining, setRemaining] = useState(defaultDuration)
-  const [status, setStatus] = useState<"idle" | "running" | "paused">("idle")
+  const [status, setStatus] = useState<
+    "idle" | "running" | "paused" | "overtime"
+  >("idle")
   const [showCompletion, setShowCompletion] = useState(false)
   const [history, setHistory] = useState<FocusSession[]>(readHistory)
   const [showCalendar, setShowCalendar] = useState(false)
+  const [showBadges, setShowBadges] = useState(false)
   const [showProfile, setShowProfile] = useState(false)
   const [finishedAt, setFinishedAt] = useState("")
   const [saveError, setSaveError] = useState("")
   const deadlineRef = useRef<number | null>(null)
+  const notifiedRef = useRef(false)
+  const audioContextRef = useRef<AudioContext | null>(null)
   const profileRef = useRef<HTMLDivElement>(null)
   const [legacySessions] = useState(() => {
     const count = Number(localStorage.getItem("pausa-sessions") || 0)
@@ -641,9 +869,13 @@ function Dashboard({
     (session) => dateKey(new Date(session.finishedAt)) === dateKey(new Date()),
   )
   const streak = currentStreak(history)
+  const weeklyStats = useMemo(() => weeklyFocusStats(history), [history])
+  const earnedBadges = weeklyBadges.filter(
+    (badge) => weeklyStats.bestStreak >= badge.weeks,
+  ).length
 
   useEffect(() => {
-    if (status !== "running") return
+    if (status !== "running" && status !== "overtime") return
 
     if (deadlineRef.current === null) {
       deadlineRef.current = Date.now() + remaining * 1000
@@ -651,17 +883,13 @@ function Dashboard({
 
     function syncWithClock() {
       if (deadlineRef.current === null) return
-      const next = Math.max(
-        0,
-        Math.ceil((deadlineRef.current - Date.now()) / 1000),
-      )
+      const next = Math.ceil((deadlineRef.current - Date.now()) / 1000)
       setRemaining(next)
 
-      if (next === 0) {
-        deadlineRef.current = null
-        setStatus("idle")
-        setFinishedAt(new Date().toISOString())
-        setShowCompletion(true)
+      if (next <= 0 && !notifiedRef.current) {
+        notifiedRef.current = true
+        setStatus("overtime")
+        announceCompletedTime()
       }
     }
 
@@ -706,6 +934,7 @@ function Dashboard({
     [duration, remaining],
   )
   const elapsed = duration - remaining
+  const extra = Math.max(0, -remaining)
 
   function changeDuration(minutes: number) {
     if (status !== "idle") return
@@ -715,18 +944,17 @@ function Dashboard({
   }
 
   function startSession() {
+    prepareAlerts()
+    notifiedRef.current = false
     deadlineRef.current = Date.now() + remaining * 1000
     setStatus("running")
   }
 
   function togglePause() {
-    if (status === "running") {
+    if (status === "running" || status === "overtime") {
       if (deadlineRef.current !== null) {
         setRemaining(
-          Math.max(
-            0,
-            Math.ceil((deadlineRef.current - Date.now()) / 1000),
-          ),
+          Math.ceil((deadlineRef.current - Date.now()) / 1000),
         )
       }
       deadlineRef.current = null
@@ -735,19 +963,78 @@ function Dashboard({
     }
 
     deadlineRef.current = Date.now() + remaining * 1000
-    setStatus("running")
+    setStatus(remaining <= 0 ? "overtime" : "running")
   }
 
   function finishSession() {
-    if (status === "running" && deadlineRef.current !== null) {
+    if (
+      (status === "running" || status === "overtime") &&
+      deadlineRef.current !== null
+    ) {
       setRemaining(
-        Math.max(0, Math.ceil((deadlineRef.current - Date.now()) / 1000)),
+        Math.ceil((deadlineRef.current - Date.now()) / 1000),
       )
     }
     deadlineRef.current = null
     setStatus("idle")
     setFinishedAt(new Date().toISOString())
     setShowCompletion(true)
+  }
+
+  function prepareAlerts() {
+    if (!audioContextRef.current) {
+      audioContextRef.current = new AudioContext()
+    }
+    if (audioContextRef.current.state === "suspended") {
+      audioContextRef.current.resume().catch(() => undefined)
+    }
+    if ("Notification" in window && Notification.permission === "default") {
+      Notification.requestPermission().catch(() => undefined)
+    }
+  }
+
+  function playCompletionSound() {
+    const context = audioContextRef.current
+    if (!context) return
+
+    function playChime() {
+      if (!context) return
+      const start = context.currentTime
+      ;[659.25, 783.99, 987.77].forEach((frequency, index) => {
+        const oscillator = context.createOscillator()
+        const gain = context.createGain()
+        const noteStart = start + index * 0.16
+        oscillator.type = "sine"
+        oscillator.frequency.value = frequency
+        gain.gain.setValueAtTime(0.0001, noteStart)
+        gain.gain.exponentialRampToValueAtTime(0.16, noteStart + 0.025)
+        gain.gain.exponentialRampToValueAtTime(0.0001, noteStart + 0.42)
+        oscillator.connect(gain)
+        gain.connect(context.destination)
+        oscillator.start(noteStart)
+        oscillator.stop(noteStart + 0.44)
+      })
+    }
+
+    if (context.state === "suspended") {
+      context.resume().then(playChime).catch(() => undefined)
+    } else {
+      playChime()
+    }
+  }
+
+  function announceCompletedTime() {
+    playCompletionSound()
+    if ("Notification" in window && Notification.permission === "granted") {
+      try {
+        const notification = new Notification("Tiempo completado", {
+          body: "Has alcanzado tu objetivo. El tiempo extra seguirá contando hasta que finalices la sesión.",
+        })
+        notification.onclick = () => window.focus()
+      } catch {
+        // El aviso sonoro sigue funcionando si el sistema bloquea notificaciones.
+      }
+    }
   }
 
   function saveSession(note: string, rating: number) {
@@ -773,6 +1060,7 @@ function Dashboard({
 
   function closeCompletion() {
     deadlineRef.current = null
+    notifiedRef.current = false
     setSaveError("")
     setShowCompletion(false)
     setDuration(defaultDuration)
@@ -789,6 +1077,18 @@ function Dashboard({
           <span>Pausa</span>
         </div>
         <div className="topbar-actions">
+          <button
+            className="icon-btn badge-trigger"
+            aria-label={`Abrir insignias. ${earnedBadges} desbloqueadas`}
+            title="Insignias de constancia"
+            onClick={() => setShowBadges(true)}
+            aria-haspopup="dialog"
+          >
+            <Icon name="award" />
+            {earnedBadges > 0 && (
+              <span className="badge-count">{earnedBadges}</span>
+            )}
+          </button>
           <button
             className="icon-btn"
             aria-label="Abrir calendario de concentración"
@@ -913,6 +1213,8 @@ function Dashboard({
                 <span />
                 {status === "running"
                   ? "En marcha"
+                  : status === "overtime"
+                    ? "Tiempo extra"
                   : status === "paused"
                     ? "En pausa"
                     : "Listo para empezar"}
@@ -939,10 +1241,17 @@ function Dashboard({
               <Icon name="minus" />
               <span>15 min</span>
             </button>
-            <div className="timer-display">
-              <p>{formatTime(remaining)}</p>
+            <div
+              className={`timer-display ${remaining <= 0 && status !== "idle" ? "is-overtime" : ""}`}
+            >
+              <p>
+                {remaining <= 0 && status !== "idle" ? "+" : ""}
+                {formatTime(Math.abs(remaining))}
+              </p>
               <span>
-                HORAS&nbsp;&nbsp;&nbsp;&nbsp;MINUTOS&nbsp;&nbsp;&nbsp;SEGUNDOS
+                {remaining <= 0 && status !== "idle"
+                  ? "TIEMPO EXTRA · PULSA FINALIZAR CUANDO TERMINES"
+                  : "HORAS    MINUTOS    SEGUNDOS"}
               </span>
             </div>
             <button
@@ -975,8 +1284,16 @@ function Dashboard({
                   className="primary-btn start-btn"
                   onClick={togglePause}
                 >
-                  <Icon name={status === "running" ? "pause" : "play"} />
-                  {status === "running" ? "Pausar" : "Continuar"}
+                  <Icon
+                    name={
+                      status === "running" || status === "overtime"
+                        ? "pause"
+                        : "play"
+                    }
+                  />
+                  {status === "running" || status === "overtime"
+                    ? "Pausar"
+                    : "Continuar"}
                 </button>
                 <button className="secondary-btn" onClick={finishSession}>
                   <Icon name="stop" />
@@ -990,7 +1307,9 @@ function Dashboard({
               ? "Puedes ajustar el tiempo antes de comenzar"
               : status === "paused"
                 ? "Tómate un respiro. Tu progreso está guardado."
-                : "Una cosa cada vez. Nosotros cuidamos del tiempo."}
+                : status === "overtime"
+                  ? "Objetivo cumplido. El tiempo extra se sumará a tu sesión."
+                  : "Una cosa cada vez. Nosotros cuidamos del tiempo."}
           </p>
         </section>
 
@@ -1028,6 +1347,7 @@ function Dashboard({
       {showCompletion && (
         <CompletionModal
           elapsed={elapsed}
+          extra={extra}
           onClose={closeCompletion}
           onSave={saveSession}
           error={saveError}
@@ -1037,6 +1357,12 @@ function Dashboard({
         <CalendarModal
           history={history}
           onClose={() => setShowCalendar(false)}
+        />
+      )}
+      {showBadges && (
+        <BadgesModal
+          history={history}
+          onClose={() => setShowBadges(false)}
         />
       )}
     </main>
